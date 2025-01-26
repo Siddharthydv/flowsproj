@@ -1,0 +1,47 @@
+# Step 1: Use official Node.js image as a base for the build stage
+FROM node:18 AS build
+
+# Step 2: Set working directory inside the container
+WORKDIR /app
+
+# Step 3: Add build-time arguments for environment variables
+ARG NEXT_PUBLIC_BACKEND_URL
+ARG NEXT_PUBLIC_HOOKS
+
+# Step 4: Copy the package.json and package-lock.json (or yarn.lock)
+COPY package*.json ./
+
+# Step 5: Install only production dependencies
+RUN npm install --production=false
+
+# Step 6: Copy all the source code into the container
+COPY . .
+
+# Step 7: Set environment variables from build arguments
+ENV NEXT_PUBLIC_BACKEND_URL=$NEXT_PUBLIC_BACKEND_URL
+ENV NEXT_PUBLIC_HOOKS=$NEXT_PUBLIC_HOOKS
+
+# Step 8: Build the Next.js app
+RUN npm run build
+
+# Step 9: Use a smaller base image for the runtime stage
+FROM node:18-alpine AS runtime
+
+# Step 10: Set working directory inside the runtime container
+WORKDIR /app
+
+# Step 11: Copy only the necessary files (build artifacts, node_modules)
+COPY --from=build /app/package*.json ./
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/.next ./.next
+COPY --from=build /app/public ./public
+
+# Step 12: Install only production dependencies (optional if already done)
+RUN npm ci --production
+
+# Step 13: Expose the default Next.js port
+EXPOSE 3000
+
+# Step 14: Start the Next.js app
+CMD ["npm", "start"]
+

@@ -1,0 +1,29 @@
+{
+  "name": "worker",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "npx prisma generate && tsc -b && node dist/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/client": "^5.17.0",
+    "@solana/web3.js": "^1.95.1",
+    "@types/bs58": "^4.0.4",
+    "@types/nodemailer": "^6.4.15",
+    "axios": "^1.7.9",
+    "bs58": "^6.0.0",
+    "dotenv": "^16.4.5",
+    "kafkajs": "^2.2.4",
+    "nodemailer": "^6.9.14"
+  },
+  "devDependencies": {
+    "prisma": "^5.17.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
+  }
+}

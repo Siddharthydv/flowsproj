@@ -1,0 +1,22 @@
+# Use an official Node.js image as the base image
+FROM node:16-slim
+
+RUN apt-get update -y && apt-get install -y openssl
+
+# Set the working directory inside the container
+WORKDIR /usr/src/app
+
+# Copy package.json and package-lock.json (if available) into the container
+COPY package*.json ./
+
+# Install production and development dependencies inside the container
+RUN npm install
+
+# Copy the rest of the application code to the container
+COPY . .
+
+# Expose the port the app will run on
+EXPOSE 3002
+
+# Start the hooks service
+CMD ["sh", "-c", "npm run dev"]

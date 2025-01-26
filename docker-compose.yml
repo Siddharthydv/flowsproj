@@ -1,0 +1,130 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15
+    container_name: db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: mysecretpassword
+      POSTGRES_DB: postgres
+    networks:
+      - shared-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+  
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do sleep 12h & wait $!; done;'"
+
+  certbot-run:
+    image: certbot/certbot
+    depends_on:
+      - nginx
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    networks:
+      - shared-network
+    entrypoint: >
+      /bin/sh -c "
+      certbot certonly --webroot -w /var/www/certbot
+      --email ggcallahaan@gmail.com
+      --agree-tos
+      --no-eff-email
+      -d flowsproj.in -d www.flowsproj.in
+      "
+  
+  nginx:
+    image: nginx:latest
+    container_name: nginx-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - shared-network
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    depends_on:
+      - primary-backend
+      - frontend
+
+  worker:
+    build:
+      context: ./worker
+      dockerfile: DOCKERFILE
+    networks:
+      - shared-network
+    environment:
+      - KAFKA_URL=kafka:9092
+      - DATABASE_URL=postgres://postgres:mysecretpassword@db:5432/postgres
+    depends_on:
+      db:
+        condition: service_healthy
+
+  primary-backend:
+    build:
+      context: ./primary-backend
+      dockerfile: DOCKERFILE
+    ports:
+      - "4000:4000"
+    networks:
+      - shared-network
+    environment:
+      - DATABASE_URL=postgres://postgres:mysecretpassword@db:5432/postgres
+      - CORS_URL=https://flowsproj.in
+    depends_on:
+      db:
+        condition: service_healthy
+
+  hooks:
+    build:
+      context: ./hooks
+      dockerfile: DOCKERFILE
+    ports:
+      - "3002:3002"
+    networks:
+      - shared-network
+    environment:
+      - KAFKA_URL=kafka:9092
+      - DATABASE_URL=postgres://postgres:mysecretpassword@db:5432/postgres
+    depends_on:
+      db:
+        condition: service_healthy
+
+  processor:
+    build:
+      context: ./processor
+      dockerfile: DOCKERFILE
+    networks:
+      - shared-network
+    environment:
+      - KAFKA_URL=kafka:9092
+      - DATABASE_URL=postgres://postgres:mysecretpassword@db:5432/postgres
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: DOCKERFILE
+      args:
+        NEXT_PUBLIC_BACKEND_URL: "https://flowsproj.in/a"
+        NEXT_PUBLIC_HOOKS: "https://flowsproj.in/hks/"
+    ports:
+      - "3000:3000"
+    networks:
+      - shared-network
+
+networks:
+  shared-network:
+    driver: bridge
+
